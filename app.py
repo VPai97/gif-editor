@@ -209,49 +209,79 @@ def _auto_reduce_to_size(
     if not frames or target_bytes <= 0:
         return b""
 
-    colors_steps: list[int] = []
-    if max_colors >= 2:
-        colors_steps.append(max_colors)
-        for colors in [128, 64, 32, 16]:
-            if colors < max_colors:
-                colors_steps.append(colors)
-    else:
-        colors_steps = [0, 256, 128, 64, 32, 16]
+    colors_cap = min(max_colors if max_colors >= 2 else 256, 256)
+    base_data = _encode_gif(frames, durations, optimize_output, colors_cap)
+    if not base_data:
+        return b""
 
-    fps_steps: list[int] = []
+    base_size = len(base_data)
+    if base_size <= target_bytes:
+        return base_data
+
+    ratio = target_bytes / max(1, base_size)
+    if ratio >= 0.95:
+        return base_data
+
+    effective_base_fps = base_fps if base_fps > 0 else _estimate_fps(durations)
+    if effective_base_fps <= 0:
+        effective_base_fps = 12.0
+
+    fps_target = 0
     if allow_frame_drop:
-        start_fps = base_fps if base_fps > 0 else 12.0
-        for factor in [1.0, 0.85, 0.7, 0.55, 0.4]:
-            fps_steps.append(max(4, min(60, int(round(start_fps * factor)))))
-    else:
-        fps_steps = [0]
+        fps_target = max(4, int(round(effective_base_fps * (ratio**0.85))))
+        fps_target = min(fps_target, int(round(effective_base_fps)))
 
-    seen_fps: set[int] = set()
-    uniq_fps_steps: list[int] = []
-    for fps_step in fps_steps:
-        if fps_step not in seen_fps:
-            uniq_fps_steps.append(fps_step)
-            seen_fps.add(fps_step)
+    color_target = max(16, int(round(colors_cap * (ratio**0.6))))
+    color_target = min(color_target, colors_cap)
 
-    best_data = b""
-    best_size = None
+    work_frames, work_durations = frames, durations
+    if allow_frame_drop and fps_target and fps_target < effective_base_fps:
+        work_frames, work_durations = _resample_frames(frames, durations, fps_target)
 
-    for fps_step in uniq_fps_steps:
+    best_data = base_data
+    best_size = base_size
+
+    data = _encode_gif(work_frames, work_durations, True, color_target)
+    if data:
+        size = len(data)
+        if size < best_size:
+            best_size = size
+            best_data = data
+        if size <= target_bytes:
+            return data
+
+    fallback_colors: list[int] = []
+    for candidate in [max(8, color_target // 2), 64, 32, 16]:
+        if candidate <= color_target and candidate not in fallback_colors:
+            fallback_colors.append(candidate)
+
+    fallback_fps: list[int] = []
+    if allow_frame_drop:
+        base_for_fallback = fps_target if fps_target else effective_base_fps
+        for factor in [0.7, 0.5, 0.4]:
+            candidate = max(4, int(round(base_for_fallback * factor)))
+            if candidate not in fallback_fps:
+                fallback_fps.append(candidate)
+
+    if not fallback_fps:
+        fallback_fps = [0]
+
+    for fps_step in fallback_fps:
         if fps_step > 0:
             candidate_frames, candidate_durations = _resample_frames(frames, durations, fps_step)
         else:
-            candidate_frames, candidate_durations = frames, durations
+            candidate_frames, candidate_durations = work_frames, work_durations
 
-        for colors in colors_steps:
-            data = _encode_gif(candidate_frames, candidate_durations, optimize_output, colors)
+        for colors in fallback_colors:
+            data = _encode_gif(candidate_frames, candidate_durations, True, colors)
             if not data:
                 continue
             size = len(data)
-            if size <= target_bytes:
-                return data
-            if best_size is None or size < best_size:
+            if size < best_size:
                 best_size = size
                 best_data = data
+            if size <= target_bytes:
+                return data
 
     return best_data
 
