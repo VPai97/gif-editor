@@ -198,6 +198,9 @@ processBtn.addEventListener("click", async () => {
           // keep default message
         }
       }
+      if (message === "Something went wrong.") {
+        message = `Request failed (HTTP ${response.status})`;
+      }
       setStatus(message, true);
       outputSizeEl.textContent = "—";
       processBtn.disabled = false;

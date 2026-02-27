@@ -384,6 +384,7 @@ class GifEditorHandler(BaseHTTPRequestHandler):
             body = self.rfile.read(length)
             fields, files = _parse_multipart(body, content_type)
         except Exception as exc:
+            self.log_error("Form parse failed: %s", exc)
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": f"Could not read form data: {exc}"})
             return
 
@@ -494,6 +495,7 @@ class GifEditorHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
         except Exception as exc:
+            self.log_error("Processing failed: %s", exc)
             self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"Processing failed: {exc}"})
 
 
