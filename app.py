@@ -149,6 +149,113 @@ def _resample_frames(
     return sampled_frames, [duration_ms] * len(sampled_frames)
 
 
+def _estimate_fps(durations: list[int]) -> float:
+    if not durations:
+        return 0.0
+    avg = sum(durations) / max(1, len(durations))
+    if avg <= 0:
+        return 0.0
+    return 1000.0 / avg
+
+
+def _quantize_frames(frames: list[Image.Image], max_colors: int) -> list[Image.Image]:
+    if max_colors < 2:
+        return frames
+    colors = min(max_colors, 256)
+    quantized_frames: list[Image.Image] = []
+    for frame in frames:
+        rgba = frame.convert("RGBA")
+        quantized = rgba.quantize(
+            colors=colors,
+            method=Image.Quantize.FASTOCTREE,
+            dither=Image.Dither.NONE,
+        )
+        quantized_frames.append(quantized)
+    return quantized_frames
+
+
+def _encode_gif(
+    frames: list[Image.Image],
+    durations: list[int],
+    optimize_output: bool,
+    max_colors: int,
+) -> bytes:
+    if not frames:
+        return b""
+    frames_to_save = _quantize_frames(frames, max_colors)
+    output = BytesIO()
+    frames_to_save[0].save(
+        output,
+        format="GIF",
+        save_all=True,
+        append_images=frames_to_save[1:],
+        loop=0,
+        duration=durations,
+        disposal=2,
+        optimize=optimize_output,
+    )
+    return output.getvalue()
+
+
+def _auto_reduce_to_size(
+    frames: list[Image.Image],
+    durations: list[int],
+    target_bytes: int,
+    base_fps: float,
+    max_colors: int,
+    optimize_output: bool,
+    allow_frame_drop: bool,
+) -> bytes:
+    if not frames or target_bytes <= 0:
+        return b""
+
+    colors_steps: list[int] = []
+    if max_colors >= 2:
+        colors_steps.append(max_colors)
+        for colors in [128, 64, 32, 16]:
+            if colors < max_colors:
+                colors_steps.append(colors)
+    else:
+        colors_steps = [0, 256, 128, 64, 32, 16]
+
+    fps_steps: list[int] = []
+    if allow_frame_drop:
+        start_fps = base_fps if base_fps > 0 else 12.0
+        for factor in [1.0, 0.85, 0.7, 0.55, 0.4]:
+            fps_steps.append(max(4, min(60, int(round(start_fps * factor)))))
+    else:
+        fps_steps = [0]
+
+    seen_fps: set[int] = set()
+    uniq_fps_steps: list[int] = []
+    for fps_step in fps_steps:
+        if fps_step not in seen_fps:
+            uniq_fps_steps.append(fps_step)
+            seen_fps.add(fps_step)
+
+    best_data = b""
+    best_size = None
+
+    for fps_step in uniq_fps_steps:
+        if fps_step > 0:
+            candidate_frames, candidate_durations = _resample_frames(frames, durations, fps_step)
+        else:
+            candidate_frames, candidate_durations = frames, durations
+
+        for colors in colors_steps:
+            data = _encode_gif(candidate_frames, candidate_durations, optimize_output, colors)
+            if not data:
+                continue
+            size = len(data)
+            if size <= target_bytes:
+                return data
+            if best_size is None or size < best_size:
+                best_size = size
+                best_data = data
+
+    return best_data
+
+
 def _parse_multipart(body: bytes, content_type: str) -> Tuple[dict, dict]:
     headers = f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n".encode()
     message = BytesParser(policy=default).parsebytes(headers + body)
@@ -306,6 +413,8 @@ class GifEditorHandler(BaseHTTPRequestHandler):
 
             max_colors = _parse_int(fields.get("max_colors")) or 0
             optimize_output = _parse_bool(fields.get("optimize"))
+            target_size_kb = _parse_float(fields.get("target_size_kb")) or 0.0
+            auto_reduce = _parse_bool(fields.get("auto_reduce"))
 
             blur_x = _parse_int(fields.get("blur_x")) or 0
             blur_y = _parse_int(fields.get("blur_y")) or 0
@@ -351,36 +460,30 @@ class GifEditorHandler(BaseHTTPRequestHandler):
                     duration_ms = max(1, int(round(1000 / fps)))
                     durations = [duration_ms] * len(frames)
 
-            if max_colors >= 2:
+            base_name = os.path.splitext(file_info["filename"])[0] or "edited"
+            target_bytes = int(target_size_kb * 1024) if target_size_kb > 0 else 0
+            if target_bytes > 0 and auto_reduce:
+                optimize_output = True
+                base_fps = fps if fps and fps > 0 else _estimate_fps(durations)
+                data = _auto_reduce_to_size(
+                    frames=frames,
+                    durations=durations,
+                    target_bytes=target_bytes,
+                    base_fps=base_fps,
+                    max_colors=max_colors,
+                    optimize_output=optimize_output,
+                    allow_frame_drop=True,
+                )
+            else:
                 if max_colors > 256:
                     max_colors = 256
-                quantized_frames: list[Image.Image] = []
-                for frame in frames:
-                    rgba = frame.convert("RGBA")
-                    quantized = rgba.quantize(
-                        colors=max_colors,
-                        method=Image.Quantize.FASTOCTREE,
-                        dither=Image.Dither.NONE,
-                    )
-                    quantized_frames.append(quantized)
-                frames = quantized_frames
+                data = _encode_gif(
+                    frames=frames,
+                    durations=durations,
+                    optimize_output=optimize_output,
+                    max_colors=max_colors,
+                )
 
-            output = BytesIO()
-            base_name = os.path.splitext(file_info["filename"])[0] or "edited"
-
-            frames[0].save(
-                output,
-                format="GIF",
-                save_all=True,
-                append_images=frames[1:],
-                loop=0,
-                duration=durations,
-                disposal=2,
-                optimize=optimize_output,
-            )
-            output.seek(0)
-
-            data = output.getvalue()
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "image/gif")
             self.send_header(

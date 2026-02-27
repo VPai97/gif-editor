@@ -16,6 +16,8 @@ const trimStart = document.getElementById("trimStart");
 const trimEnd = document.getElementById("trimEnd");
 const maxColors = document.getElementById("maxColors");
 const optimizeOutput = document.getElementById("optimizeOutput");
+const targetSize = document.getElementById("targetSize");
+const autoReduce = document.getElementById("autoReduce");
 const blurRadius = document.getElementById("blurRadius");
 const blurValue = document.getElementById("blurValue");
 const processBtn = document.getElementById("processBtn");
@@ -149,6 +151,8 @@ processBtn.addEventListener("click", async () => {
   formData.append("trim_end", trimEnd.value);
   formData.append("max_colors", maxColors.value);
   formData.append("optimize", optimizeOutput.checked ? "on" : "off");
+  formData.append("target_size_kb", targetSize.value);
+  formData.append("auto_reduce", autoReduce.checked ? "on" : "off");
   formData.append("blur_radius", blurRadius.value);
 
   if (

@@ -84,6 +84,14 @@
             <span>Optimize output for smaller file</span>
           </label>
           <label class="field">
+            <span>Target size (KB)</span>
+            <input id="targetSize" type="number" min="1" step="10" placeholder="e.g. 800" />
+          </label>
+          <label class="checkbox">
+            <input id="autoReduce" type="checkbox" checked />
+            <span>Auto reduce to target size (may drop frames/colors)</span>
+          </label>
+          <label class="field">
             <span>Blur radius</span>
             <div class="range-wrap">
               <input id="blurRadius" type="range" min="0" max="30" value="8" />

@@ -21,6 +21,7 @@ Then open `http://127.0.0.1:5000` in your browser.
 - Leave FPS blank to keep the original timing.
 - Use trim start/end to cut the GIF by time (seconds).
 - Use max colors + optimize to shrink file size.
+- Use target size (KB) to auto-reduce file size by dropping frames and colors.
 - The server binds to `0.0.0.0` by default and honors `$PORT` for hosted platforms.
 
 ## Deploy on Render
