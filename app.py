@@ -10,7 +10,7 @@ from io import BytesIO
 from typing import Optional, Tuple
 from urllib.parse import unquote
 
-from PIL import Image, ImageFilter, ImageSequence
+from PIL import Image, ImageSequence
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
@@ -447,12 +447,6 @@ class GifEditorHandler(BaseHTTPRequestHandler):
             target_size_kb = _parse_float(fields.get("target_size_kb")) or 0.0
             auto_reduce = _parse_bool(fields.get("auto_reduce"))
 
-            blur_x = _parse_int(fields.get("blur_x")) or 0
-            blur_y = _parse_int(fields.get("blur_y")) or 0
-            blur_w = _parse_int(fields.get("blur_w")) or 0
-            blur_h = _parse_int(fields.get("blur_h")) or 0
-            blur_radius = _parse_float(fields.get("blur_radius")) or 0.0
-
             orig_w, orig_h = image.size
             out_w, out_h = _compute_target_size(orig_w, orig_h, target_w, target_h, keep_aspect)
 
@@ -462,16 +456,6 @@ class GifEditorHandler(BaseHTTPRequestHandler):
             for frame in ImageSequence.Iterator(image):
                 duration = frame.info.get("duration", image.info.get("duration", 100))
                 current = frame.convert("RGBA")
-
-                if blur_w > 0 and blur_h > 0 and blur_radius > 0:
-                    x0 = _clamp(blur_x, 0, orig_w - 1)
-                    y0 = _clamp(blur_y, 0, orig_h - 1)
-                    x1 = _clamp(blur_x + blur_w, 0, orig_w)
-                    y1 = _clamp(blur_y + blur_h, 0, orig_h)
-                    if x1 > x0 and y1 > y0:
-                        region = current.crop((x0, y0, x1, y1))
-                        region = region.filter(ImageFilter.GaussianBlur(radius=blur_radius))
-                        current.paste(region, (x0, y0), region)
 
                 if (out_w, out_h) != (orig_w, orig_h):
                     current = current.resize((out_w, out_h), Image.LANCZOS)

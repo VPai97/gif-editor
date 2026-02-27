@@ -36,8 +36,6 @@
         <div class="meta">Original size: <span id="origSize">—</span></div>
         <div class="meta">File size: <span id="origFileSize">—</span></div>
 
-        <button id="clearSelection" type="button" class="ghost">Clear blur selection</button>
-
         <div class="settings">
           <h2>Settings</h2>
           <label class="field">
@@ -91,14 +89,6 @@
             <input id="autoReduce" type="checkbox" checked />
             <span>Auto reduce to target size (may drop frames/colors)</span>
           </label>
-          <label class="field">
-            <span>Blur radius</span>
-            <div class="range-wrap">
-              <input id="blurRadius" type="range" min="0" max="30" value="8" />
-              <span id="blurValue">8</span>
-            </div>
-          </label>
-
           <button id="processBtn" type="button">Process GIF</button>
           <p id="status" class="status"></p>
           <div class="meta">Output size: <span id="outputSize">—</span></div>
@@ -112,10 +102,9 @@
             <div class="preview-stage">
               <div class="preview-placeholder">GIF preview</div>
               <img id="preview" class="preview-image hidden" alt="GIF preview" />
-              <canvas id="overlay"></canvas>
             </div>
           </div>
-          <p class="helper">Drag on the canvas to select a blur region.</p>
+          <p class="helper">Preview your GIF before export.</p>
         </div>
 
         <div class="timeline">

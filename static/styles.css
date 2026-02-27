@@ -164,11 +164,6 @@ input[type="file"] {
   color: var(--muted);
 }
 
-.range-wrap {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
 
 button {
   border: none;
@@ -274,13 +269,6 @@ button:disabled {
   border-radius: 10px;
 }
 
-#overlay {
-  position: absolute;
-  left: 0;
-  top: 0;
-  border-radius: 10px;
-  cursor: crosshair;
-}
 
 .helper {
   margin-top: 14px;

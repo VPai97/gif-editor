@@ -2,9 +2,6 @@ const fileInput = document.getElementById("gifInput");
 const uploadCard = document.querySelector(".upload-card");
 const preview = document.getElementById("preview");
 const previewPlaceholder = document.querySelector(".preview-placeholder");
-const overlay = document.getElementById("overlay");
-const ctx = overlay.getContext("2d");
-const clearSelectionBtn = document.getElementById("clearSelection");
 const origSizeEl = document.getElementById("origSize");
 const origFileSizeEl = document.getElementById("origFileSize");
 const outputSizeEl = document.getElementById("outputSize");
@@ -20,18 +17,12 @@ const maxColors = document.getElementById("maxColors");
 const optimizeOutput = document.getElementById("optimizeOutput");
 const targetSize = document.getElementById("targetSize");
 const autoReduce = document.getElementById("autoReduce");
-const blurRadius = document.getElementById("blurRadius");
-const blurValue = document.getElementById("blurValue");
 const processBtn = document.getElementById("processBtn");
 const statusEl = document.getElementById("status");
 const downloadLink = document.getElementById("downloadLink");
 
 let naturalWidth = 0;
 let naturalHeight = 0;
-let selection = null;
-let isDragging = false;
-let startX = 0;
-let startY = 0;
 let currentFile = null;
 let currentObjectUrl = null;
 
@@ -46,29 +37,6 @@ function formatBytes(bytes) {
     unitIndex += 1;
   }
   return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[unitIndex]}`;
-}
-
-function updateCanvasSize() {
-  overlay.width = preview.clientWidth || 0;
-  overlay.height = preview.clientHeight || 0;
-  drawSelection();
-}
-
-function clearSelection() {
-  selection = null;
-  ctx.clearRect(0, 0, overlay.width, overlay.height);
-}
-
-function drawSelection() {
-  ctx.clearRect(0, 0, overlay.width, overlay.height);
-  if (!selection) return;
-
-  ctx.fillStyle = "rgba(255, 120, 80, 0.25)";
-  ctx.strokeStyle = "rgba(255, 120, 80, 0.9)";
-  ctx.lineWidth = 2;
-
-  ctx.fillRect(selection.x, selection.y, selection.w, selection.h);
-  ctx.strokeRect(selection.x, selection.y, selection.w, selection.h);
 }
 
 function setStatus(message, isError = false) {
@@ -88,7 +56,7 @@ function loadFile(file) {
   previewPlaceholder.classList.add("hidden");
   downloadLink.classList.add("hidden");
   outputSizeEl.textContent = "—";
-  setStatus("GIF loaded. Draw a blur region if needed.");
+  setStatus("GIF loaded.");
   origFileSizeEl.textContent = formatBytes(file.size);
 }
 
@@ -122,55 +90,12 @@ preview.addEventListener("load", () => {
   naturalWidth = preview.naturalWidth;
   naturalHeight = preview.naturalHeight;
   origSizeEl.textContent = `${naturalWidth} x ${naturalHeight}`;
-  updateCanvasSize();
-  clearSelection();
 });
 
 preview.addEventListener("error", () => {
   preview.classList.add("hidden");
   previewPlaceholder.classList.remove("hidden");
   setStatus("Could not load the selected GIF.", true);
-});
-
-blurRadius.addEventListener("input", () => {
-  blurValue.textContent = blurRadius.value;
-});
-
-overlay.addEventListener("mousedown", (event) => {
-  if (!preview.src) return;
-  const rect = overlay.getBoundingClientRect();
-  startX = event.clientX - rect.left;
-  startY = event.clientY - rect.top;
-  isDragging = true;
-  selection = { x: startX, y: startY, w: 0, h: 0 };
-});
-
-overlay.addEventListener("mousemove", (event) => {
-  if (!isDragging) return;
-  const rect = overlay.getBoundingClientRect();
-  const currentX = event.clientX - rect.left;
-  const currentY = event.clientY - rect.top;
-
-  const x = Math.min(startX, currentX);
-  const y = Math.min(startY, currentY);
-  const w = Math.abs(currentX - startX);
-  const h = Math.abs(currentY - startY);
-
-  selection = { x, y, w, h };
-  drawSelection();
-});
-
-function stopDrag() {
-  if (!isDragging) return;
-  isDragging = false;
-  drawSelection();
-}
-
-overlay.addEventListener("mouseup", stopDrag);
-overlay.addEventListener("mouseleave", stopDrag);
-
-clearSelectionBtn.addEventListener("click", () => {
-  clearSelection();
 });
 
 processBtn.addEventListener("click", async () => {
@@ -193,24 +118,6 @@ processBtn.addEventListener("click", async () => {
   formData.append("optimize", optimizeOutput.checked ? "on" : "off");
   formData.append("target_size_kb", targetSize.value);
   formData.append("auto_reduce", autoReduce.checked ? "on" : "off");
-  formData.append("blur_radius", blurRadius.value);
-
-  if (
-    selection &&
-    selection.w > 0 &&
-    selection.h > 0 &&
-    naturalWidth &&
-    naturalHeight &&
-    overlay.width > 0 &&
-    overlay.height > 0
-  ) {
-    const scaleX = naturalWidth / overlay.width;
-    const scaleY = naturalHeight / overlay.height;
-    formData.append("blur_x", Math.round(selection.x * scaleX));
-    formData.append("blur_y", Math.round(selection.y * scaleY));
-    formData.append("blur_w", Math.round(selection.w * scaleX));
-    formData.append("blur_h", Math.round(selection.h * scaleY));
-  }
 
   processBtn.disabled = true;
   setStatus("Processing GIF...", false);
