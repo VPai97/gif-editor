@@ -234,26 +234,50 @@ class GifEditorHandler(BaseHTTPRequestHandler):
 
         self.send_error(HTTPStatus.NOT_FOUND, "Not found")
 
+    def do_HEAD(self) -> None:  # noqa: N802 - required by BaseHTTPRequestHandler
+        if self.path == "/":
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            return
+
+        if self.path.startswith("/static/"):
+            rel_path = unquote(self.path[len("/static/") :])
+            safe_path = os.path.normpath(rel_path)
+            if safe_path.startswith(".."):
+                self.send_error(HTTPStatus.BAD_REQUEST, "Invalid path")
+                return
+            file_path = os.path.join(STATIC_DIR, safe_path)
+            if not os.path.exists(file_path):
+                self.send_error(HTTPStatus.NOT_FOUND, "File not found")
+                return
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", self._content_type_for(file_path))
+            self.end_headers()
+            return
+
+        self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+
     def do_POST(self) -> None:  # noqa: N802 - required by BaseHTTPRequestHandler
         if self.path != "/process":
             self.send_error(HTTPStatus.NOT_FOUND, "Not found")
             return
 
-        length = int(self.headers.get("Content-Length", "0"))
-        if length > MAX_CONTENT_LENGTH:
-            self._send_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "File too large."})
-            return
-
-        content_type = self.headers.get("Content-Type", "")
-        if "multipart/form-data" not in content_type:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid form data."})
-            return
-
         try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length > MAX_CONTENT_LENGTH:
+                self._send_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "File too large."})
+                return
+
+            content_type = self.headers.get("Content-Type", "")
+            if "multipart/form-data" not in content_type:
+                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid form data."})
+                return
+
             body = self.rfile.read(length)
             fields, files = _parse_multipart(body, content_type)
-        except Exception:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Could not read form data."})
+        except Exception as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": f"Could not read form data: {exc}"})
             return
 
         file_info = files.get("gif")
@@ -267,109 +291,107 @@ class GifEditorHandler(BaseHTTPRequestHandler):
 
         try:
             image = Image.open(BytesIO(file_info["data"]))
-        except Exception:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Could not read the GIF file."})
-            return
+            if image.format != "GIF":
+                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Only GIF files are supported."})
+                return
 
-        if image.format != "GIF":
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Only GIF files are supported."})
-            return
+            target_w = _parse_int(fields.get("target_width"))
+            target_h = _parse_int(fields.get("target_height"))
+            keep_aspect = fields.get("keep_aspect") == "on"
+            fps = _parse_float(fields.get("fps"))
+            resample_fps = _parse_bool(fields.get("resample_fps"))
 
-        target_w = _parse_int(fields.get("target_width"))
-        target_h = _parse_int(fields.get("target_height"))
-        keep_aspect = fields.get("keep_aspect") == "on"
-        fps = _parse_float(fields.get("fps"))
-        resample_fps = _parse_bool(fields.get("resample_fps"))
+            trim_start = _parse_float(fields.get("trim_start")) or 0.0
+            trim_end = _parse_float(fields.get("trim_end"))
 
-        trim_start = _parse_float(fields.get("trim_start")) or 0.0
-        trim_end = _parse_float(fields.get("trim_end"))
+            max_colors = _parse_int(fields.get("max_colors")) or 0
+            optimize_output = _parse_bool(fields.get("optimize"))
 
-        max_colors = _parse_int(fields.get("max_colors")) or 0
-        optimize_output = _parse_bool(fields.get("optimize"))
+            blur_x = _parse_int(fields.get("blur_x")) or 0
+            blur_y = _parse_int(fields.get("blur_y")) or 0
+            blur_w = _parse_int(fields.get("blur_w")) or 0
+            blur_h = _parse_int(fields.get("blur_h")) or 0
+            blur_radius = _parse_float(fields.get("blur_radius")) or 0.0
 
-        blur_x = _parse_int(fields.get("blur_x")) or 0
-        blur_y = _parse_int(fields.get("blur_y")) or 0
-        blur_w = _parse_int(fields.get("blur_w")) or 0
-        blur_h = _parse_int(fields.get("blur_h")) or 0
-        blur_radius = _parse_float(fields.get("blur_radius")) or 0.0
+            orig_w, orig_h = image.size
+            out_w, out_h = _compute_target_size(orig_w, orig_h, target_w, target_h, keep_aspect)
 
-        orig_w, orig_h = image.size
-        out_w, out_h = _compute_target_size(orig_w, orig_h, target_w, target_h, keep_aspect)
+            frames = []
+            durations = []
 
-        frames = []
-        durations = []
+            for frame in ImageSequence.Iterator(image):
+                duration = frame.info.get("duration", image.info.get("duration", 100))
+                current = frame.convert("RGBA")
 
-        for frame in ImageSequence.Iterator(image):
-            duration = frame.info.get("duration", image.info.get("duration", 100))
-            current = frame.convert("RGBA")
+                if blur_w > 0 and blur_h > 0 and blur_radius > 0:
+                    x0 = _clamp(blur_x, 0, orig_w - 1)
+                    y0 = _clamp(blur_y, 0, orig_h - 1)
+                    x1 = _clamp(blur_x + blur_w, 0, orig_w)
+                    y1 = _clamp(blur_y + blur_h, 0, orig_h)
+                    if x1 > x0 and y1 > y0:
+                        region = current.crop((x0, y0, x1, y1))
+                        region = region.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+                        current.paste(region, (x0, y0), region)
 
-            if blur_w > 0 and blur_h > 0 and blur_radius > 0:
-                x0 = _clamp(blur_x, 0, orig_w - 1)
-                y0 = _clamp(blur_y, 0, orig_h - 1)
-                x1 = _clamp(blur_x + blur_w, 0, orig_w)
-                y1 = _clamp(blur_y + blur_h, 0, orig_h)
-                if x1 > x0 and y1 > y0:
-                    region = current.crop((x0, y0, x1, y1))
-                    region = region.filter(ImageFilter.GaussianBlur(radius=blur_radius))
-                    current.paste(region, (x0, y0), region)
+                if (out_w, out_h) != (orig_w, orig_h):
+                    current = current.resize((out_w, out_h), Image.LANCZOS)
 
-            if (out_w, out_h) != (orig_w, orig_h):
-                current = current.resize((out_w, out_h), Image.LANCZOS)
+                frames.append(current)
+                durations.append(int(duration) if duration else 100)
 
-            frames.append(current)
-            durations.append(int(duration) if duration else 100)
+            frames, durations = _trim_frames(frames, durations, trim_start, trim_end)
+            if not frames:
+                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Trim range removed all frames."})
+                return
 
-        frames, durations = _trim_frames(frames, durations, trim_start, trim_end)
-        if not frames:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Trim range removed all frames."})
-            return
+            if fps and fps > 0:
+                if resample_fps:
+                    frames, durations = _resample_frames(frames, durations, fps)
+                else:
+                    duration_ms = max(1, int(round(1000 / fps)))
+                    durations = [duration_ms] * len(frames)
 
-        if fps and fps > 0:
-            if resample_fps:
-                frames, durations = _resample_frames(frames, durations, fps)
-            else:
-                duration_ms = max(1, int(round(1000 / fps)))
-                durations = [duration_ms] * len(frames)
+            if max_colors >= 2:
+                if max_colors > 256:
+                    max_colors = 256
+                quantized_frames: list[Image.Image] = []
+                for frame in frames:
+                    rgba = frame.convert("RGBA")
+                    quantized = rgba.quantize(
+                        colors=max_colors,
+                        method=Image.Quantize.FASTOCTREE,
+                        dither=Image.Dither.NONE,
+                    )
+                    quantized_frames.append(quantized)
+                frames = quantized_frames
 
-        if max_colors >= 2:
-            if max_colors > 256:
-                max_colors = 256
-            quantized_frames: list[Image.Image] = []
-            for frame in frames:
-                rgba = frame.convert("RGBA")
-                quantized = rgba.quantize(
-                    colors=max_colors,
-                    method=Image.Quantize.FASTOCTREE,
-                    dither=Image.Dither.NONE,
-                )
-                quantized_frames.append(quantized)
-            frames = quantized_frames
+            output = BytesIO()
+            base_name = os.path.splitext(file_info["filename"])[0] or "edited"
 
-        output = BytesIO()
-        base_name = os.path.splitext(file_info["filename"])[0] or "edited"
+            frames[0].save(
+                output,
+                format="GIF",
+                save_all=True,
+                append_images=frames[1:],
+                loop=0,
+                duration=durations,
+                disposal=2,
+                optimize=optimize_output,
+            )
+            output.seek(0)
 
-        frames[0].save(
-            output,
-            format="GIF",
-            save_all=True,
-            append_images=frames[1:],
-            loop=0,
-            duration=durations,
-            disposal=2,
-            optimize=optimize_output,
-        )
-        output.seek(0)
-
-        data = output.getvalue()
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "image/gif")
-        self.send_header(
-            "Content-Disposition",
-            f'attachment; filename="{base_name}_edited.gif"',
-        )
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
+            data = output.getvalue()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "image/gif")
+            self.send_header(
+                "Content-Disposition",
+                f'attachment; filename="{base_name}_edited.gif"',
+            )
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        except Exception as exc:
+            self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"Processing failed: {exc}"})
 
 
 def _load_port(default_port: int) -> int:

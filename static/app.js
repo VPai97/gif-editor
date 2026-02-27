@@ -178,8 +178,23 @@ processBtn.addEventListener("click", async () => {
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      setStatus(data.error || "Something went wrong.", true);
+      let message = "Something went wrong.";
+      try {
+        const data = await response.json();
+        if (data && data.error) {
+          message = data.error;
+        }
+      } catch (jsonError) {
+        try {
+          const text = await response.text();
+          if (text) {
+            message = text.slice(0, 200);
+          }
+        } catch (textError) {
+          // keep default message
+        }
+      }
+      setStatus(message, true);
       outputSizeEl.textContent = "—";
       processBtn.disabled = false;
       return;
