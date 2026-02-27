@@ -30,6 +30,7 @@
           <p class="help">Drag on the preview to mark the blur region. Leave empty to skip blur.</p>
           <button id="clearSelection" type="button">Clear selection</button>
           <div class="meta">Original size: <span id="origSize">—</span></div>
+          <div class="meta">File size: <span id="origFileSize">—</span></div>
         </section>
 
         <section class="panel">
@@ -54,7 +55,39 @@
             <span>FPS (frames per second)</span>
             <input id="fps" type="number" min="1" max="60" step="1" placeholder="e.g. 12" />
           </label>
+          <label class="checkbox">
+            <input id="resampleFps" type="checkbox" checked />
+            <span>Resample frames to target FPS (smaller file)</span>
+          </label>
           <p class="hint">Leave FPS blank to keep the original timing.</p>
+
+          <label class="field">
+            <span>Trim start (seconds)</span>
+            <input id="trimStart" type="number" min="0" step="0.1" placeholder="e.g. 0.0" />
+          </label>
+
+          <label class="field">
+            <span>Trim end (seconds)</span>
+            <input id="trimEnd" type="number" min="0" step="0.1" placeholder="e.g. 2.5" />
+          </label>
+          <p class="hint">Leave both blank to keep the full length.</p>
+
+          <label class="field">
+            <span>Max colors</span>
+            <select id="maxColors">
+              <option value="">Keep original</option>
+              <option value="256">256 (GIF default)</option>
+              <option value="128">128</option>
+              <option value="64">64</option>
+              <option value="32">32</option>
+              <option value="16">16</option>
+            </select>
+          </label>
+
+          <label class="checkbox">
+            <input id="optimizeOutput" type="checkbox" checked />
+            <span>Optimize output for smaller file</span>
+          </label>
 
           <label class="field">
             <span>Blur radius</span>
@@ -66,6 +99,7 @@
 
           <button id="processBtn" type="button">Process GIF</button>
           <p id="status" class="status"></p>
+          <div class="meta">Output size: <span id="outputSize">—</span></div>
           <a id="downloadLink" class="download hidden" download>Download edited GIF</a>
         </section>
       </main>

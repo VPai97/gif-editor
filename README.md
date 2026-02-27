@@ -1,6 +1,6 @@
 # Zigma
 
-Local web app for editing GIFs: resize, blur a region, and adjust FPS.
+Local web app for editing GIFs: resize, blur a region, trim, and reduce file size.
 
 ## Setup
 
@@ -19,6 +19,8 @@ Then open `http://127.0.0.1:5000` in your browser.
 - Blur selection is drawn on the preview; leave it empty to skip blur.
 - If one of width or height is blank and "Keep aspect" is on, the other dimension is computed automatically.
 - Leave FPS blank to keep the original timing.
+- Use trim start/end to cut the GIF by time (seconds).
+- Use max colors + optimize to shrink file size.
 - The server binds to `0.0.0.0` by default and honors `$PORT` for hosted platforms.
 
 ## Deploy on Render

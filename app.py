@@ -42,6 +42,12 @@ def _parse_float(value: Optional[str]) -> Optional[float]:
         return None
 
 
+def _parse_bool(value: Optional[str]) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "on", "yes"}
+
+
 def _clamp(value: int, low: int, high: int) -> int:
     return max(low, min(high, value))
 
@@ -65,6 +71,82 @@ def _compute_target_size(
     if target_w or target_h:
         return max(1, target_w or orig_w), max(1, target_h or orig_h)
     return orig_w, orig_h
+
+
+def _trim_frames(
+    frames: list[Image.Image],
+    durations: list[int],
+    start_s: float,
+    end_s: Optional[float],
+) -> Tuple[list[Image.Image], list[int]]:
+    if start_s <= 0 and end_s is None:
+        return frames, durations
+
+    total_ms = sum(durations)
+    start_ms = max(0.0, start_s * 1000.0)
+    end_ms = total_ms if end_s is None else max(0.0, end_s * 1000.0)
+
+    if end_ms <= start_ms:
+        return [], []
+
+    trimmed_frames: list[Image.Image] = []
+    trimmed_durations: list[int] = []
+
+    cursor = 0.0
+    for frame, duration in zip(frames, durations):
+        frame_start = cursor
+        frame_end = cursor + duration
+        cursor = frame_end
+
+        if frame_end <= start_ms:
+            continue
+        if frame_start >= end_ms:
+            break
+
+        overlap_start = max(frame_start, start_ms)
+        overlap_end = min(frame_end, end_ms)
+        overlap_ms = max(1, int(round(overlap_end - overlap_start)))
+
+        trimmed_frames.append(frame)
+        trimmed_durations.append(overlap_ms)
+
+    return trimmed_frames, trimmed_durations
+
+
+def _resample_frames(
+    frames: list[Image.Image],
+    durations: list[int],
+    fps: float,
+) -> Tuple[list[Image.Image], list[int]]:
+    if fps <= 0 or not frames:
+        return frames, durations
+
+    total_ms = sum(durations)
+    if total_ms <= 0:
+        total_ms = len(frames) * 100
+
+    target_count = max(1, int(round((total_ms / 1000.0) * fps)))
+    if target_count >= len(frames):
+        duration_ms = max(1, int(round(1000.0 / fps)))
+        return frames, [duration_ms] * len(frames)
+
+    cumulative: list[int] = []
+    running = 0
+    for duration in durations:
+        running += max(1, int(duration))
+        cumulative.append(running)
+
+    step = total_ms / target_count
+    sampled_frames: list[Image.Image] = []
+    idx = 0
+    for i in range(target_count):
+        target = (i + 0.5) * step
+        while idx < len(cumulative) - 1 and target > cumulative[idx]:
+            idx += 1
+        sampled_frames.append(frames[idx])
+
+    duration_ms = max(1, int(round(1000.0 / fps)))
+    return sampled_frames, [duration_ms] * len(sampled_frames)
 
 
 def _parse_multipart(body: bytes, content_type: str) -> Tuple[dict, dict]:
@@ -197,6 +279,13 @@ class GifEditorHandler(BaseHTTPRequestHandler):
         target_h = _parse_int(fields.get("target_height"))
         keep_aspect = fields.get("keep_aspect") == "on"
         fps = _parse_float(fields.get("fps"))
+        resample_fps = _parse_bool(fields.get("resample_fps"))
+
+        trim_start = _parse_float(fields.get("trim_start")) or 0.0
+        trim_end = _parse_float(fields.get("trim_end"))
+
+        max_colors = _parse_int(fields.get("max_colors")) or 0
+        optimize_output = _parse_bool(fields.get("optimize"))
 
         blur_x = _parse_int(fields.get("blur_x")) or 0
         blur_y = _parse_int(fields.get("blur_y")) or 0
@@ -228,11 +317,33 @@ class GifEditorHandler(BaseHTTPRequestHandler):
                 current = current.resize((out_w, out_h), Image.LANCZOS)
 
             frames.append(current)
-            durations.append(duration)
+            durations.append(int(duration) if duration else 100)
+
+        frames, durations = _trim_frames(frames, durations, trim_start, trim_end)
+        if not frames:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Trim range removed all frames."})
+            return
 
         if fps and fps > 0:
-            duration_ms = max(1, int(round(1000 / fps)))
-            durations = [duration_ms] * len(frames)
+            if resample_fps:
+                frames, durations = _resample_frames(frames, durations, fps)
+            else:
+                duration_ms = max(1, int(round(1000 / fps)))
+                durations = [duration_ms] * len(frames)
+
+        if max_colors >= 2:
+            if max_colors > 256:
+                max_colors = 256
+            quantized_frames: list[Image.Image] = []
+            for frame in frames:
+                rgba = frame.convert("RGBA")
+                quantized = rgba.quantize(
+                    colors=max_colors,
+                    method=Image.Quantize.FASTOCTREE,
+                    dither=Image.Dither.NONE,
+                )
+                quantized_frames.append(quantized)
+            frames = quantized_frames
 
         output = BytesIO()
         base_name = os.path.splitext(file_info["filename"])[0] or "edited"
@@ -245,6 +356,7 @@ class GifEditorHandler(BaseHTTPRequestHandler):
             loop=0,
             duration=durations,
             disposal=2,
+            optimize=optimize_output,
         )
         output.seek(0)
 

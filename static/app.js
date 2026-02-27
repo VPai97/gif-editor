@@ -4,11 +4,18 @@ const overlay = document.getElementById("overlay");
 const ctx = overlay.getContext("2d");
 const clearSelectionBtn = document.getElementById("clearSelection");
 const origSizeEl = document.getElementById("origSize");
+const origFileSizeEl = document.getElementById("origFileSize");
+const outputSizeEl = document.getElementById("outputSize");
 
 const targetWidth = document.getElementById("targetWidth");
 const targetHeight = document.getElementById("targetHeight");
 const keepAspect = document.getElementById("keepAspect");
 const fpsInput = document.getElementById("fps");
+const resampleFps = document.getElementById("resampleFps");
+const trimStart = document.getElementById("trimStart");
+const trimEnd = document.getElementById("trimEnd");
+const maxColors = document.getElementById("maxColors");
+const optimizeOutput = document.getElementById("optimizeOutput");
 const blurRadius = document.getElementById("blurRadius");
 const blurValue = document.getElementById("blurValue");
 const processBtn = document.getElementById("processBtn");
@@ -21,6 +28,19 @@ let selection = null;
 let isDragging = false;
 let startX = 0;
 let startY = 0;
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes)) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[unitIndex]}`;
+}
 
 function updateCanvasSize() {
   overlay.width = preview.clientWidth || 0;
@@ -57,7 +77,9 @@ fileInput.addEventListener("change", () => {
   const url = URL.createObjectURL(file);
   preview.src = url;
   downloadLink.classList.add("hidden");
+  outputSizeEl.textContent = "—";
   setStatus("GIF loaded. Draw a blur region if needed.");
+  origFileSizeEl.textContent = formatBytes(file.size);
 });
 
 preview.addEventListener("load", () => {
@@ -122,6 +144,11 @@ processBtn.addEventListener("click", async () => {
   formData.append("target_height", targetHeight.value);
   formData.append("keep_aspect", keepAspect.checked ? "on" : "off");
   formData.append("fps", fpsInput.value);
+  formData.append("resample_fps", resampleFps.checked ? "on" : "off");
+  formData.append("trim_start", trimStart.value);
+  formData.append("trim_end", trimEnd.value);
+  formData.append("max_colors", maxColors.value);
+  formData.append("optimize", optimizeOutput.checked ? "on" : "off");
   formData.append("blur_radius", blurRadius.value);
 
   if (
@@ -153,6 +180,7 @@ processBtn.addEventListener("click", async () => {
     if (!response.ok) {
       const data = await response.json();
       setStatus(data.error || "Something went wrong.", true);
+      outputSizeEl.textContent = "—";
       processBtn.disabled = false;
       return;
     }
@@ -161,9 +189,11 @@ processBtn.addEventListener("click", async () => {
     const downloadUrl = URL.createObjectURL(blob);
     downloadLink.href = downloadUrl;
     downloadLink.classList.remove("hidden");
+    outputSizeEl.textContent = formatBytes(blob.size);
     setStatus("All set. Download your edited GIF.");
   } catch (error) {
     setStatus("Failed to process GIF.", true);
+    outputSizeEl.textContent = "—";
   } finally {
     processBtn.disabled = false;
   }
