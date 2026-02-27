@@ -20,10 +20,11 @@
         </div>
 
         <input id="gifInput" class="file-input" type="file" accept="image/gif" />
-        <label class="upload-card" for="gifInput">
+        <div id="uploadCard" class="upload-card" role="button" tabindex="0">
           <p>Click to upload</p>
           <span>or drag & drop file here</span>
-        </label>
+          <div id="uploadMeta" class="upload-meta">No file chosen</div>
+        </div>
 
         <div class="meta">Original size: <span id="origSize">—</span></div>
         <div class="meta">File size: <span id="origFileSize">—</span></div>

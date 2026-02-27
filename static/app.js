@@ -1,5 +1,6 @@
 const fileInput = document.getElementById("gifInput");
-const uploadCard = document.querySelector(".upload-card");
+const uploadCard = document.getElementById("uploadCard");
+const uploadMeta = document.getElementById("uploadMeta");
 const preview = document.getElementById("preview");
 const previewPlaceholder = document.querySelector(".preview-placeholder");
 const origSizeEl = document.getElementById("origSize");
@@ -56,6 +57,9 @@ function loadFile(file) {
   outputSizeEl.textContent = "—";
   setStatus("GIF loaded.");
   origFileSizeEl.textContent = formatBytes(file.size);
+  if (uploadMeta) {
+    uploadMeta.textContent = file.name;
+  }
 }
 
 fileInput.addEventListener("change", () => {
@@ -63,6 +67,25 @@ fileInput.addEventListener("change", () => {
   if (!file) return;
   loadFile(file);
 });
+
+function triggerFileDialog() {
+  if (fileInput) {
+    fileInput.click();
+  }
+}
+
+if (uploadCard) {
+  uploadCard.addEventListener("click", () => {
+    triggerFileDialog();
+  });
+
+  uploadCard.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      triggerFileDialog();
+    }
+  });
+}
 
 uploadCard.addEventListener("dragover", (event) => {
   event.preventDefault();
