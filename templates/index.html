@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Zigma</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script defer src="/static/app.js"></script>
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Local GIF Editor</p>
+          <h1>Zigma</h1>
+          <p class="subtitle">Resize, blur a spot, and tune frame rate without leaving your browser.</p>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel">
+          <h2>1. Upload + Select Blur</h2>
+          <input id="gifInput" type="file" accept="image/gif" />
+
+          <div id="previewWrap" class="preview-wrap">
+            <img id="preview" alt="GIF preview" />
+            <canvas id="overlay"></canvas>
+          </div>
+
+          <p class="help">Drag on the preview to mark the blur region. Leave empty to skip blur.</p>
+          <button id="clearSelection" type="button">Clear selection</button>
+          <div class="meta">Original size: <span id="origSize">—</span></div>
+        </section>
+
+        <section class="panel">
+          <h2>2. Edit Settings</h2>
+
+          <label class="field">
+            <span>Target width (px)</span>
+            <input id="targetWidth" type="number" min="1" placeholder="e.g. 480" />
+          </label>
+
+          <label class="field">
+            <span>Target height (px)</span>
+            <input id="targetHeight" type="number" min="1" placeholder="e.g. 270" />
+          </label>
+
+          <label class="checkbox">
+            <input id="keepAspect" type="checkbox" checked />
+            <span>Keep aspect ratio if one dimension is blank</span>
+          </label>
+
+          <label class="field">
+            <span>FPS (frames per second)</span>
+            <input id="fps" type="number" min="1" max="60" step="1" placeholder="e.g. 12" />
+          </label>
+          <p class="hint">Leave FPS blank to keep the original timing.</p>
+
+          <label class="field">
+            <span>Blur radius</span>
+            <div class="range-wrap">
+              <input id="blurRadius" type="range" min="0" max="30" value="8" />
+              <span id="blurValue">8</span>
+            </div>
+          </label>
+
+          <button id="processBtn" type="button">Process GIF</button>
+          <p id="status" class="status"></p>
+          <a id="downloadLink" class="download hidden" download>Download edited GIF</a>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
