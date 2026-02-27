@@ -449,6 +449,17 @@ class GifEditorHandler(BaseHTTPRequestHandler):
 
             orig_w, orig_h = image.size
             out_w, out_h = _compute_target_size(orig_w, orig_h, target_w, target_h, keep_aspect)
+            if auto_reduce and target_size_kb > 0 and not target_w and not target_h:
+                input_bytes = len(file_info.get("data") or b"")
+                target_bytes = int(target_size_kb * 1024)
+                if input_bytes > 0 and target_bytes > 0:
+                    ratio = target_bytes / max(1, input_bytes)
+                    if ratio < 0.95:
+                        scale = max(0.3, ratio ** 0.5)
+                        scaled_w = max(1, int(orig_w * scale))
+                        scaled_h = max(1, int(orig_h * scale))
+                        if scaled_w < out_w or scaled_h < out_h:
+                            out_w, out_h = scaled_w, scaled_h
 
             frames = []
             durations = []
@@ -458,7 +469,13 @@ class GifEditorHandler(BaseHTTPRequestHandler):
                 current = frame.convert("RGBA")
 
                 if (out_w, out_h) != (orig_w, orig_h):
-                    current = current.resize((out_w, out_h), Image.LANCZOS)
+                    current = current.resize((out_w, out_h), Image.BILINEAR)
+
+                current = current.quantize(
+                    colors=256,
+                    method=Image.Quantize.FASTOCTREE,
+                    dither=Image.Dither.NONE,
+                )
 
                 frames.append(current)
                 durations.append(int(duration) if duration else 100)
