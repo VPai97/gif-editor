@@ -9,28 +9,66 @@
   </head>
   <body>
     <div class="workspace">
-      <aside class="sidebar">
-        <div class="brand">Z</div>
+      <header class="topbar">
+        <div class="topbar-brand">
+          <div class="logo">Z</div>
+          <div>
+            <h1>Zigma Studio</h1>
+            <p>Capture + edit GIFs like a mini Camtasia</p>
+          </div>
+        </div>
+        <div class="topbar-modes">
+          <span class="mode-pill active">Editor</span>
+          <span class="mode-pill">Capture</span>
+        </div>
+        <div class="topbar-actions">
+          <button id="processBtn" class="primary" type="button">Export GIF</button>
+        </div>
+      </header>
+
+      <aside class="modebar">
+        <span class="mode-dot active">Edit</span>
+        <span class="mode-dot">Record</span>
+        <span class="mode-dot">Annotate</span>
       </aside>
 
-      <section class="left-panel">
-        <div class="panel-header">
-          <h1>Zigma</h1>
-          <p>GIF editor workspace</p>
+      <section class="media-panel">
+        <div class="panel-title">
+          <h2>Media Bin</h2>
+          <span>Project assets</span>
         </div>
-
         <input id="gifInput" class="file-input" type="file" accept="image/gif" />
         <div id="uploadCard" class="upload-card" role="button" tabindex="0">
           <p>Click to upload</p>
           <span>or drag & drop file here</span>
           <div id="uploadMeta" class="upload-meta">No file chosen</div>
         </div>
-
         <div class="meta">Original size: <span id="origSize">—</span></div>
         <div class="meta">File size: <span id="origFileSize">—</span></div>
+        <div class="panel-section">
+          <div class="section-title">Recent clips</div>
+          <div class="clip-card">Drop a GIF to see it here.</div>
+        </div>
+      </section>
 
+      <section class="stage">
+        <div class="stage-inner">
+          <div id="previewWrap" class="preview-wrap">
+            <div class="preview-stage">
+              <div class="preview-placeholder">GIF preview</div>
+              <img id="preview" class="preview-image hidden" alt="GIF preview" />
+            </div>
+          </div>
+          <p class="helper">Preview your GIF before export.</p>
+        </div>
+      </section>
+
+      <aside class="inspector">
+        <div class="panel-title">
+          <h2>Properties</h2>
+          <span>Screen2GIF-style controls</span>
+        </div>
         <div class="settings">
-          <h2>Settings</h2>
           <label class="field">
             <span>Target width (px)</span>
             <input id="targetWidth" type="number" min="1" placeholder="e.g. 480" />
@@ -67,33 +105,26 @@
             <input id="autoReduce" type="checkbox" checked />
             <span>Auto reduce to target size (may drop frames/colors)</span>
           </label>
-          <button id="processBtn" type="button">Process GIF</button>
-          <p id="status" class="status"></p>
-          <div class="meta">Output size: <span id="outputSize">—</span></div>
-          <a id="downloadLink" class="download hidden" download>Download edited GIF</a>
-        </div>
-      </section>
-
-      <section class="stage">
-        <div class="stage-inner">
-          <div id="previewWrap" class="preview-wrap">
-            <div class="preview-stage">
-              <div class="preview-placeholder">GIF preview</div>
-              <img id="preview" class="preview-image hidden" alt="GIF preview" />
-            </div>
-          </div>
-          <p class="helper">Preview your GIF before export.</p>
-        </div>
-
-        <div class="timeline">
-          <div class="timeline-track">
-            <div class="timeline-label">00:00 / 00:00</div>
-            <div class="timeline-bar">
-              <div class="timeline-progress"></div>
-            </div>
+          <div class="status-block">
+            <p id="status" class="status"></p>
+            <div class="meta">Output size: <span id="outputSize">—</span></div>
+            <a id="downloadLink" class="download hidden" download>Download edited GIF</a>
           </div>
         </div>
-      </section>
+      </aside>
+
+      <div class="timeline">
+        <div class="timeline-header">
+          <span>Timeline</span>
+          <span class="timeline-time">00:00 / 00:00</span>
+        </div>
+        <div class="timeline-track">
+          <div class="track-label">Track 1</div>
+          <div class="timeline-bar">
+            <div class="timeline-progress"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </body>
 </html>
