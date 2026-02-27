@@ -13,8 +13,6 @@ const fpsInput = document.getElementById("fps");
 const resampleFps = document.getElementById("resampleFps");
 const trimStart = document.getElementById("trimStart");
 const trimEnd = document.getElementById("trimEnd");
-const maxColors = document.getElementById("maxColors");
-const optimizeOutput = document.getElementById("optimizeOutput");
 const targetSize = document.getElementById("targetSize");
 const autoReduce = document.getElementById("autoReduce");
 const processBtn = document.getElementById("processBtn");
@@ -114,8 +112,6 @@ processBtn.addEventListener("click", async () => {
   formData.append("resample_fps", resampleFps.checked ? "on" : "off");
   formData.append("trim_start", trimStart.value);
   formData.append("trim_end", trimEnd.value);
-  formData.append("max_colors", maxColors.value);
-  formData.append("optimize", optimizeOutput.checked ? "on" : "off");
   formData.append("target_size_kb", targetSize.value);
   formData.append("auto_reduce", autoReduce.checked ? "on" : "off");
 

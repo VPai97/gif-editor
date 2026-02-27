@@ -442,8 +442,8 @@ class GifEditorHandler(BaseHTTPRequestHandler):
             trim_start = _parse_float(fields.get("trim_start")) or 0.0
             trim_end = _parse_float(fields.get("trim_end"))
 
-            max_colors = _parse_int(fields.get("max_colors")) or 0
-            optimize_output = _parse_bool(fields.get("optimize"))
+            max_colors = 0
+            optimize_output = True
             target_size_kb = _parse_float(fields.get("target_size_kb")) or 0.0
             auto_reduce = _parse_bool(fields.get("auto_reduce"))
 
