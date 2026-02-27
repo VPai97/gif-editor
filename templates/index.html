@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Zigma</title>
     <link rel="stylesheet" href="/static/styles.css" />
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.10.1/dist/ffmpeg.min.js"></script>
     <script defer src="/static/app.js"></script>
   </head>
   <body>
@@ -19,7 +20,6 @@
         </div>
         <div class="topbar-modes">
           <span class="mode-pill active">Editor</span>
-          <span class="mode-pill">Capture</span>
         </div>
         <div class="topbar-actions">
           <button id="processBtn" class="primary" type="button">Export GIF</button>
@@ -28,8 +28,6 @@
 
       <aside class="modebar">
         <span class="mode-dot active">Edit</span>
-        <span class="mode-dot">Record</span>
-        <span class="mode-dot">Annotate</span>
       </aside>
 
       <section class="media-panel">
@@ -37,7 +35,7 @@
           <h2>Media Bin</h2>
           <span>Project assets</span>
         </div>
-        <input id="gifInput" class="file-input" type="file" accept="image/gif" />
+        <input id="gifInput" class="file-input" type="file" accept="image/gif,video/*" />
         <div id="uploadCard" class="upload-card" role="button" tabindex="0">
           <p>Click to upload</p>
           <span>or drag & drop file here</span>
@@ -57,9 +55,11 @@
             <div class="preview-stage">
               <div class="preview-placeholder">GIF preview</div>
               <img id="preview" class="preview-image hidden" alt="GIF preview" />
+              <video id="previewVideo" class="preview-video hidden" controls></video>
+              <canvas id="overlay"></canvas>
             </div>
           </div>
-          <p class="helper">Preview your GIF before export.</p>
+          <p class="helper">Drag on the preview to select a region for blur or highlight.</p>
         </div>
       </section>
 
@@ -103,8 +103,35 @@
           </label>
           <label class="checkbox">
             <input id="autoReduce" type="checkbox" checked />
-            <span>Auto reduce to target size (may drop frames/colors)</span>
+            <span>Auto reduce to target size (may drop frames/scale)</span>
           </label>
+          <div class="panel-section">
+            <div class="section-title">Annotations</div>
+            <label class="checkbox">
+              <input id="blurEnable" type="checkbox" />
+              <span>Blur selected region</span>
+            </label>
+            <label class="field">
+              <span>Blur strength</span>
+              <div class="range-wrap">
+                <input id="blurRadius" type="range" min="2" max="24" value="10" />
+                <span id="blurValue">10</span>
+              </div>
+            </label>
+            <label class="checkbox">
+              <input id="boxEnable" type="checkbox" />
+              <span>Highlight box</span>
+            </label>
+            <label class="field">
+              <span>Box color</span>
+              <input id="boxColor" type="color" value="#4dd2b7" />
+            </label>
+            <label class="field">
+              <span>Box thickness (px)</span>
+              <input id="boxThickness" type="number" min="1" max="20" value="3" />
+            </label>
+            <button id="clearSelection" type="button" class="secondary">Clear selection</button>
+          </div>
           <div class="status-block">
             <p id="status" class="status"></p>
             <div class="meta">Output size: <span id="outputSize">—</span></div>

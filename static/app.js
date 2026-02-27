@@ -1,8 +1,12 @@
 const fileInput = document.getElementById("gifInput");
 const uploadCard = document.getElementById("uploadCard");
 const uploadMeta = document.getElementById("uploadMeta");
+const previewStage = document.querySelector(".preview-stage");
 const preview = document.getElementById("preview");
+const previewVideo = document.getElementById("previewVideo");
 const previewPlaceholder = document.querySelector(".preview-placeholder");
+const overlay = document.getElementById("overlay");
+const ctx = overlay.getContext("2d");
 const origSizeEl = document.getElementById("origSize");
 const origFileSizeEl = document.getElementById("origFileSize");
 const outputSizeEl = document.getElementById("outputSize");
@@ -16,14 +20,35 @@ const trimStart = document.getElementById("trimStart");
 const trimEnd = document.getElementById("trimEnd");
 const targetSize = document.getElementById("targetSize");
 const autoReduce = document.getElementById("autoReduce");
+
+const blurEnable = document.getElementById("blurEnable");
+const blurRadius = document.getElementById("blurRadius");
+const blurValue = document.getElementById("blurValue");
+const boxEnable = document.getElementById("boxEnable");
+const boxColor = document.getElementById("boxColor");
+const boxThickness = document.getElementById("boxThickness");
+const clearSelectionBtn = document.getElementById("clearSelection");
+
 const processBtn = document.getElementById("processBtn");
 const statusEl = document.getElementById("status");
 const downloadLink = document.getElementById("downloadLink");
 
-let naturalWidth = 0;
-let naturalHeight = 0;
+const FFMPEG_CORE_PATH = "https://unpkg.com/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js";
+
+let sourceWidth = 0;
+let sourceHeight = 0;
 let currentFile = null;
 let currentObjectUrl = null;
+let currentIsVideo = false;
+let selection = null;
+let isDragging = false;
+let startX = 0;
+let startY = 0;
+
+let ffmpeg = null;
+let ffmpegFetchFile = null;
+let ffmpegReady = false;
+let ffmpegLoading = false;
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes)) return "—";
@@ -43,22 +68,94 @@ function setStatus(message, isError = false) {
   statusEl.className = isError ? "status error" : "status";
 }
 
+function parseNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function updateCanvasSize() {
+  if (!previewStage) return;
+  const width = Math.max(1, previewStage.clientWidth);
+  const height = Math.max(1, previewStage.clientHeight);
+  overlay.width = width;
+  overlay.height = height;
+  drawSelection();
+}
+
+function drawSelection() {
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  if (!selection) return;
+
+  ctx.fillStyle = "rgba(77, 210, 183, 0.2)";
+  ctx.strokeStyle = "rgba(77, 210, 183, 0.9)";
+  ctx.lineWidth = 2;
+  ctx.fillRect(selection.x, selection.y, selection.w, selection.h);
+  ctx.strokeRect(selection.x, selection.y, selection.w, selection.h);
+}
+
+function clearSelection() {
+  selection = null;
+  drawSelection();
+}
+
+function updateOverlayActive() {
+  const active = blurEnable.checked || boxEnable.checked;
+  overlay.style.pointerEvents = active ? "auto" : "none";
+  overlay.style.opacity = active ? "1" : "0";
+  if (!active) {
+    clearSelection();
+  }
+}
+
+function showPreviewPlaceholder(label) {
+  previewPlaceholder.textContent = label;
+  previewPlaceholder.classList.remove("hidden");
+  preview.classList.add("hidden");
+  previewVideo.classList.add("hidden");
+  clearSelection();
+  updateCanvasSize();
+}
+
+function setSourceSize(width, height) {
+  sourceWidth = width || 0;
+  sourceHeight = height || 0;
+  if (sourceWidth && sourceHeight) {
+    origSizeEl.textContent = `${sourceWidth} x ${sourceHeight}`;
+  }
+  requestAnimationFrame(updateCanvasSize);
+}
+
 function loadFile(file) {
   if (!file) return;
   currentFile = file;
+  currentIsVideo = file.type.startsWith("video/");
   if (currentObjectUrl) {
     URL.revokeObjectURL(currentObjectUrl);
   }
   currentObjectUrl = URL.createObjectURL(file);
-  preview.src = currentObjectUrl;
-  preview.classList.remove("hidden");
-  previewPlaceholder.classList.add("hidden");
-  downloadLink.classList.add("hidden");
   outputSizeEl.textContent = "—";
-  setStatus("GIF loaded.");
+  downloadLink.classList.add("hidden");
   origFileSizeEl.textContent = formatBytes(file.size);
-  if (uploadMeta) {
-    uploadMeta.textContent = file.name;
+  uploadMeta.textContent = file.name;
+
+  if (currentIsVideo) {
+    previewVideo.src = currentObjectUrl;
+    previewVideo.classList.remove("hidden");
+    preview.classList.add("hidden");
+    previewPlaceholder.classList.add("hidden");
+    setStatus("Video loaded.");
+  } else {
+    preview.src = currentObjectUrl;
+    preview.classList.remove("hidden");
+    previewVideo.classList.add("hidden");
+    previewPlaceholder.classList.add("hidden");
+    setStatus("GIF loaded.");
+  }
+}
+
+function triggerFileDialog() {
+  if (fileInput) {
+    fileInput.click();
   }
 }
 
@@ -68,24 +165,16 @@ fileInput.addEventListener("change", () => {
   loadFile(file);
 });
 
-function triggerFileDialog() {
-  if (fileInput) {
-    fileInput.click();
-  }
-}
+uploadCard.addEventListener("click", () => {
+  triggerFileDialog();
+});
 
-if (uploadCard) {
-  uploadCard.addEventListener("click", () => {
+uploadCard.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
     triggerFileDialog();
-  });
-
-  uploadCard.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      triggerFileDialog();
-    }
-  });
-}
+  }
+});
 
 uploadCard.addEventListener("dragover", (event) => {
   event.preventDefault();
@@ -108,81 +197,292 @@ uploadCard.addEventListener("drop", (event) => {
 });
 
 preview.addEventListener("load", () => {
-  naturalWidth = preview.naturalWidth;
-  naturalHeight = preview.naturalHeight;
-  origSizeEl.textContent = `${naturalWidth} x ${naturalHeight}`;
+  setSourceSize(preview.naturalWidth, preview.naturalHeight);
 });
 
 preview.addEventListener("error", () => {
-  preview.classList.add("hidden");
-  previewPlaceholder.classList.remove("hidden");
+  showPreviewPlaceholder("Could not load GIF preview");
   setStatus("Could not load the selected GIF.", true);
 });
 
-processBtn.addEventListener("click", async () => {
-  const file = currentFile || (fileInput.files && fileInput.files[0]);
-  if (!file) {
-    setStatus("Please upload a GIF first.", true);
+previewVideo.addEventListener("loadedmetadata", () => {
+  setSourceSize(previewVideo.videoWidth, previewVideo.videoHeight);
+});
+
+previewVideo.addEventListener("error", () => {
+  showPreviewPlaceholder("Could not load video preview");
+  setStatus("Could not load the selected video.", true);
+});
+
+blurRadius.addEventListener("input", () => {
+  blurValue.textContent = blurRadius.value;
+});
+
+clearSelectionBtn.addEventListener("click", () => {
+  clearSelection();
+});
+
+blurEnable.addEventListener("change", updateOverlayActive);
+boxEnable.addEventListener("change", updateOverlayActive);
+
+overlay.addEventListener("mousedown", (event) => {
+  if (!sourceWidth || !sourceHeight) return;
+  if (overlay.style.pointerEvents === "none") return;
+  const rect = overlay.getBoundingClientRect();
+  startX = event.clientX - rect.left;
+  startY = event.clientY - rect.top;
+  isDragging = true;
+  selection = { x: startX, y: startY, w: 0, h: 0 };
+});
+
+overlay.addEventListener("mousemove", (event) => {
+  if (!isDragging) return;
+  const rect = overlay.getBoundingClientRect();
+  const currentX = event.clientX - rect.left;
+  const currentY = event.clientY - rect.top;
+  const x = Math.min(startX, currentX);
+  const y = Math.min(startY, currentY);
+  const w = Math.abs(currentX - startX);
+  const h = Math.abs(currentY - startY);
+  selection = { x, y, w, h };
+  drawSelection();
+});
+
+function stopDrag() {
+  if (!isDragging) return;
+  isDragging = false;
+  drawSelection();
+}
+
+overlay.addEventListener("mouseup", stopDrag);
+overlay.addEventListener("mouseleave", stopDrag);
+
+window.addEventListener("resize", updateCanvasSize);
+
+async function ensureFfmpeg() {
+  if (ffmpegReady) return;
+  if (ffmpegLoading) {
+    while (!ffmpegReady) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     return;
   }
 
-  const formData = new FormData();
-  formData.append("gif", file);
-  formData.append("target_width", targetWidth.value);
-  formData.append("target_height", targetHeight.value);
-  formData.append("keep_aspect", keepAspect.checked ? "on" : "off");
-  formData.append("fps", fpsInput.value);
-  formData.append("resample_fps", resampleFps.checked ? "on" : "off");
-  formData.append("trim_start", trimStart.value);
-  formData.append("trim_end", trimEnd.value);
-  formData.append("target_size_kb", targetSize.value);
-  formData.append("auto_reduce", autoReduce.checked ? "on" : "off");
+  if (!window.FFmpeg || !window.FFmpeg.createFFmpeg) {
+    throw new Error("FFmpeg failed to load.");
+  }
+
+  ffmpegLoading = true;
+  const { createFFmpeg, fetchFile } = FFmpeg;
+  ffmpeg = createFFmpeg({ log: false, corePath: FFMPEG_CORE_PATH });
+  ffmpegFetchFile = fetchFile;
+  if (ffmpeg.setProgress) {
+    ffmpeg.setProgress(({ ratio }) => {
+      if (!Number.isFinite(ratio)) return;
+      const percent = Math.round(ratio * 100);
+      setStatus(`Processing... ${percent}%`);
+    });
+  }
+  await ffmpeg.load();
+  ffmpegReady = true;
+  ffmpegLoading = false;
+}
+
+function computeOutputSettings() {
+  const tw = Math.round(parseNumber(targetWidth.value));
+  const th = Math.round(parseNumber(targetHeight.value));
+  let outW = sourceWidth || tw || 0;
+  let outH = sourceHeight || th || 0;
+
+  if (tw || th) {
+    if (keepAspect.checked && (tw === 0 || th === 0)) {
+      if (tw) {
+        outW = tw;
+        outH = Math.max(1, Math.round((sourceHeight * tw) / sourceWidth));
+      } else {
+        outH = th;
+        outW = Math.max(1, Math.round((sourceWidth * th) / sourceHeight));
+      }
+    } else {
+      outW = tw || sourceWidth;
+      outH = th || sourceHeight;
+    }
+  }
+
+  let fpsValue = parseNumber(fpsInput.value);
+  let fpsToUse = resampleFps.checked && fpsValue > 0 ? fpsValue : 0;
+
+  const targetBytes = parseNumber(targetSize.value) * 1024;
+  if (autoReduce.checked && targetBytes > 0 && currentFile && currentFile.size > 0) {
+    const ratio = targetBytes / currentFile.size;
+    if (!tw && !th && ratio < 0.95) {
+      const scale = Math.max(0.3, Math.sqrt(ratio));
+      outW = Math.max(1, Math.round(sourceWidth * scale));
+      outH = Math.max(1, Math.round(sourceHeight * scale));
+    }
+    if (!fpsValue && ratio < 0.95) {
+      const baseFps = 12;
+      fpsToUse = Math.max(4, Math.round(baseFps * Math.pow(ratio, 0.7)));
+    }
+  }
+
+  return { outW, outH, fpsToUse };
+}
+
+function getSelectionForOutput(outW, outH) {
+  if (!selection || overlay.width === 0 || overlay.height === 0) return null;
+  const scaleX = outW / overlay.width;
+  const scaleY = outH / overlay.height;
+  let x = Math.round(selection.x * scaleX);
+  let y = Math.round(selection.y * scaleY);
+  let w = Math.round(selection.w * scaleX);
+  let h = Math.round(selection.h * scaleY);
+
+  x = Math.max(0, Math.min(x, outW - 1));
+  y = Math.max(0, Math.min(y, outH - 1));
+  w = Math.max(1, Math.min(w, outW - x));
+  h = Math.max(1, Math.min(h, outH - y));
+
+  return { x, y, w, h };
+}
+
+function buildFilterGraph(outW, outH, fpsToUse, selectionOutput) {
+  const parts = [];
+  let labelIndex = 0;
+  let current = "[0:v]";
+  const nextLabel = () => `[v${labelIndex++}]`;
+
+  const chain = [];
+  if (outW && outH && (outW !== sourceWidth || outH !== sourceHeight)) {
+    chain.push(`scale=${outW}:${outH}:flags=lanczos`);
+  }
+  if (fpsToUse && fpsToUse > 0) {
+    chain.push(`fps=${fpsToUse}`);
+  }
+  if (chain.length) {
+    const out = nextLabel();
+    parts.push(`${current}${chain.join(",")}${out}`);
+    current = out;
+  }
+
+  if (blurEnable.checked && selectionOutput) {
+    const base = nextLabel();
+    const tmp = nextLabel();
+    const blurred = nextLabel();
+    const out = nextLabel();
+    const radius = Math.max(1, Math.round(parseNumber(blurRadius.value)));
+
+    parts.push(`${current}split=2${base}${tmp}`);
+    parts.push(
+      `${tmp}crop=${selectionOutput.w}:${selectionOutput.h}:${selectionOutput.x}:${selectionOutput.y},boxblur=${radius}:1${blurred}`
+    );
+    parts.push(`${base}${blurred}overlay=${selectionOutput.x}:${selectionOutput.y}${out}`);
+    current = out;
+  }
+
+  if (boxEnable.checked && selectionOutput) {
+    const out = nextLabel();
+    const colorValue = (boxColor.value || "#4dd2b7").replace("#", "");
+    const thickness = Math.max(1, Math.round(parseNumber(boxThickness.value)));
+    parts.push(
+      `${current}drawbox=x=${selectionOutput.x}:y=${selectionOutput.y}:w=${selectionOutput.w}:h=${selectionOutput.h}:color=0x${colorValue}@0.9:t=${thickness}${out}`
+    );
+    current = out;
+  }
+
+  if (!parts.length) {
+    return { filter: "", map: "" };
+  }
+
+  return { filter: parts.join(";"), map: current };
+}
+
+function getInputExtension(file) {
+  const name = file.name || "input";
+  const parts = name.split(".");
+  if (parts.length > 1) {
+    return parts.pop().toLowerCase();
+  }
+  if (file.type.startsWith("video/")) return "mp4";
+  return "gif";
+}
+
+processBtn.addEventListener("click", async () => {
+  if (!currentFile) {
+    setStatus("Please upload a GIF or video first.", true);
+    return;
+  }
+
+  if ((blurEnable.checked || boxEnable.checked) && !selection) {
+    setStatus("Select a region on the preview first.", true);
+    return;
+  }
 
   processBtn.disabled = true;
-  setStatus("Processing GIF...", false);
+  setStatus("Loading encoder...");
 
   try {
-    const response = await fetch("/process", {
-      method: "POST",
-      body: formData,
-    });
+    await ensureFfmpeg();
+    setStatus("Preparing export...");
 
-    if (!response.ok) {
-      let message = "Something went wrong.";
-      try {
-        const data = await response.json();
-        if (data && data.error) {
-          message = data.error;
-        }
-      } catch (jsonError) {
-        try {
-          const text = await response.text();
-          if (text) {
-            message = text.slice(0, 200);
-          }
-        } catch (textError) {
-          // keep default message
-        }
-      }
-      if (message === "Something went wrong.") {
-        message = `Request failed (HTTP ${response.status})`;
-      }
-      setStatus(message, true);
-      outputSizeEl.textContent = "—";
-      processBtn.disabled = false;
-      return;
+    const inputName = `input.${getInputExtension(currentFile)}`;
+    const outputName = "output.gif";
+
+    try {
+      ffmpeg.FS("unlink", inputName);
+    } catch (error) {
+      // ignore
+    }
+    try {
+      ffmpeg.FS("unlink", outputName);
+    } catch (error) {
+      // ignore
     }
 
-    const blob = await response.blob();
+    ffmpeg.FS("writeFile", inputName, await ffmpegFetchFile(currentFile));
+
+    const trimStartVal = parseNumber(trimStart.value);
+    const trimEndVal = parseNumber(trimEnd.value);
+    const duration = trimEndVal > trimStartVal ? trimEndVal - trimStartVal : 0;
+
+    const { outW, outH, fpsToUse } = computeOutputSettings();
+    const selectionOutput = getSelectionForOutput(outW || sourceWidth, outH || sourceHeight);
+
+    const { filter, map } = buildFilterGraph(outW, outH, fpsToUse, selectionOutput);
+
+    const args = [];
+    if (trimStartVal > 0) {
+      args.push("-ss", trimStartVal.toString());
+    }
+    args.push("-i", inputName);
+    if (duration > 0) {
+      args.push("-t", duration.toString());
+    }
+    if (filter) {
+      args.push("-filter_complex", filter, "-map", map);
+    }
+    args.push("-loop", "0", outputName);
+
+    setStatus("Encoding GIF...");
+    await ffmpeg.run(...args);
+
+    const data = ffmpeg.FS("readFile", outputName);
+    const blob = new Blob([data.buffer], { type: "image/gif" });
     const downloadUrl = URL.createObjectURL(blob);
+    const baseName = currentFile.name ? currentFile.name.split(".")[0] : "zigma";
+
     downloadLink.href = downloadUrl;
+    downloadLink.download = `${baseName}_edited.gif`;
     downloadLink.classList.remove("hidden");
     outputSizeEl.textContent = formatBytes(blob.size);
-    setStatus("All set. Download your edited GIF.");
+    setStatus("All set. Download your GIF.");
   } catch (error) {
-    setStatus("Failed to process GIF.", true);
+    setStatus(`Processing failed: ${error.message || error}`, true);
     outputSizeEl.textContent = "—";
   } finally {
     processBtn.disabled = false;
   }
 });
+
+showPreviewPlaceholder("GIF or video preview");
+updateOverlayActive();

@@ -1,6 +1,6 @@
 # Zigma
 
-Local web app for editing GIFs: resize, trim, and reduce file size.
+Local web app for editing GIFs and videos: resize, trim, blur regions, highlight boxes, and reduce file size.
 
 ## Setup
 
@@ -18,10 +18,16 @@ Then open `http://127.0.0.1:5000` in your browser.
 
 - If one of width or height is blank and "Keep aspect" is on, the other dimension is computed automatically.
 - Leave FPS blank to keep the original timing.
-- Use trim start/end to cut the GIF by time (seconds).
-- Use target size (KB) to auto-reduce file size by dropping frames and colors.
-- When target size is set (and no explicit width/height), Zigma may downscale resolution to meet the size faster.
+- Upload GIFs or videos (MP4/WEBM/MOV) and export as GIF.
+- Use trim start/end to cut a video or GIF by time (seconds).
+- Use target size (KB) to auto-reduce file size by dropping frames and scaling.
+- Use blur/highlight with a selection box on the preview.
 - The server binds to `0.0.0.0` by default and honors `$PORT` for hosted platforms.
+
+## In-Browser Processing
+
+Zigma now processes media directly in the browser using FFmpeg.wasm (no backend required).
+The first run downloads the encoder bundle, which can take a few seconds.
 
 ## Deploy on Render
 

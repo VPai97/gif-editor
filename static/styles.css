@@ -237,6 +237,15 @@ input[type="file"] {
   color: var(--ink);
 }
 
+input[type="color"] {
+  width: 100%;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #13161b;
+  padding: 4px;
+}
+
 .file-input {
   display: none;
 }
@@ -248,6 +257,12 @@ input[type="file"] {
   margin: 10px 0;
   font-size: 13px;
   color: var(--muted);
+}
+
+.range-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 button {
@@ -276,6 +291,12 @@ button:disabled {
 
 .primary {
   background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+}
+
+.secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
 }
 
 .download {
@@ -340,6 +361,24 @@ button:disabled {
 
 .preview-image.hidden {
   display: none;
+}
+
+.preview-image,
+.preview-video {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 12px;
+}
+
+.preview-video.hidden {
+  display: none;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
 }
 
 .helper {
