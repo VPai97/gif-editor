@@ -1,5 +1,7 @@
 const fileInput = document.getElementById("gifInput");
+const uploadCard = document.querySelector(".upload-card");
 const preview = document.getElementById("preview");
+const previewPlaceholder = document.querySelector(".preview-placeholder");
 const overlay = document.getElementById("overlay");
 const ctx = overlay.getContext("2d");
 const clearSelectionBtn = document.getElementById("clearSelection");
@@ -30,6 +32,8 @@ let selection = null;
 let isDragging = false;
 let startX = 0;
 let startY = 0;
+let currentFile = null;
+let currentObjectUrl = null;
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes)) return "—";
@@ -72,16 +76,46 @@ function setStatus(message, isError = false) {
   statusEl.className = isError ? "status error" : "status";
 }
 
-fileInput.addEventListener("change", () => {
-  const file = fileInput.files && fileInput.files[0];
+function loadFile(file) {
   if (!file) return;
-
-  const url = URL.createObjectURL(file);
-  preview.src = url;
+  currentFile = file;
+  if (currentObjectUrl) {
+    URL.revokeObjectURL(currentObjectUrl);
+  }
+  currentObjectUrl = URL.createObjectURL(file);
+  preview.src = currentObjectUrl;
+  preview.classList.remove("hidden");
+  previewPlaceholder.classList.add("hidden");
   downloadLink.classList.add("hidden");
   outputSizeEl.textContent = "—";
   setStatus("GIF loaded. Draw a blur region if needed.");
   origFileSizeEl.textContent = formatBytes(file.size);
+}
+
+fileInput.addEventListener("change", () => {
+  const file = fileInput.files && fileInput.files[0];
+  if (!file) return;
+  loadFile(file);
+});
+
+uploadCard.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  uploadCard.classList.add("dragging");
+});
+
+uploadCard.addEventListener("dragleave", () => {
+  uploadCard.classList.remove("dragging");
+});
+
+uploadCard.addEventListener("drop", (event) => {
+  event.preventDefault();
+  uploadCard.classList.remove("dragging");
+  const file = event.dataTransfer && event.dataTransfer.files[0];
+  if (!file) return;
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  fileInput.files = dt.files;
+  loadFile(file);
 });
 
 preview.addEventListener("load", () => {
@@ -90,6 +124,12 @@ preview.addEventListener("load", () => {
   origSizeEl.textContent = `${naturalWidth} x ${naturalHeight}`;
   updateCanvasSize();
   clearSelection();
+});
+
+preview.addEventListener("error", () => {
+  preview.classList.add("hidden");
+  previewPlaceholder.classList.remove("hidden");
+  setStatus("Could not load the selected GIF.", true);
 });
 
 blurRadius.addEventListener("input", () => {
@@ -134,7 +174,7 @@ clearSelectionBtn.addEventListener("click", () => {
 });
 
 processBtn.addEventListener("click", async () => {
-  const file = fileInput.files && fileInput.files[0];
+  const file = currentFile || (fileInput.files && fileInput.files[0]);
   if (!file) {
     setStatus("Please upload a GIF first.", true);
     return;

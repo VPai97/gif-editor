@@ -98,10 +98,18 @@ body {
   display: grid;
   gap: 8px;
   justify-items: center;
+  cursor: pointer;
+  transition: border 0.2s ease, background 0.2s ease;
 }
 
-.upload-card input[type="file"] {
-  color: var(--muted);
+.upload-card:hover {
+  border-color: #4a4f5b;
+  background: #2c303a;
+}
+
+.upload-card.dragging {
+  border-color: var(--accent);
+  background: rgba(79, 124, 255, 0.12);
 }
 
 .upload-card p {
@@ -141,6 +149,10 @@ input[type="file"] {
   font-size: 14px;
   background: #111317;
   color: var(--ink);
+}
+
+.file-input {
+  display: none;
 }
 
 .checkbox {
@@ -239,6 +251,19 @@ button:disabled {
   position: relative;
   display: inline-block;
   max-width: 100%;
+}
+
+.preview-placeholder {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 24px 40px;
+  border-radius: 12px;
+  background: #171a20;
+  border: 1px solid #2b2f39;
+}
+
+.preview-image.hidden {
+  display: none;
 }
 
 #preview {

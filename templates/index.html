@@ -27,11 +27,11 @@
           <p>GIF editor workspace</p>
         </div>
 
-        <div class="upload-card">
-          <input id="gifInput" type="file" accept="image/gif" />
+        <input id="gifInput" class="file-input" type="file" accept="image/gif" />
+        <label class="upload-card" for="gifInput">
           <p>Click to upload</p>
           <span>or drag & drop file here</span>
-        </div>
+        </label>
 
         <div class="meta">Original size: <span id="origSize">—</span></div>
         <div class="meta">File size: <span id="origFileSize">—</span></div>
@@ -110,7 +110,8 @@
         <div class="stage-inner">
           <div id="previewWrap" class="preview-wrap">
             <div class="preview-stage">
-              <img id="preview" alt="GIF preview" />
+              <div class="preview-placeholder">GIF preview</div>
+              <img id="preview" class="preview-image hidden" alt="GIF preview" />
               <canvas id="overlay"></canvas>
             </div>
           </div>
