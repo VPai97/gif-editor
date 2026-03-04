@@ -320,6 +320,12 @@ def _parse_multipart(body: bytes, content_type: str) -> Tuple[dict, dict]:
 class GifEditorHandler(BaseHTTPRequestHandler):
     server_version = "Zigma/1.0"
 
+    def end_headers(self) -> None:
+        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+        self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+        self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+        super().end_headers()
+
     def _send_json(self, status: int, payload: dict) -> None:
         data = json.dumps(payload).encode("utf-8")
         self.send_response(status)

@@ -16,11 +16,17 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 100%;
   font-family: "Sora", "Segoe UI", sans-serif;
   color: var(--ink);
+  overflow: hidden;
   background:
     radial-gradient(circle at 15% 15%, rgba(77, 210, 183, 0.18), transparent 45%),
     radial-gradient(circle at 80% 10%, rgba(86, 120, 240, 0.2), transparent 40%),
@@ -30,8 +36,9 @@ body {
 .workspace {
   display: grid;
   grid-template-columns: 64px 280px 1fr 320px;
-  grid-template-rows: auto 1fr auto;
-  min-height: 100vh;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  overflow: hidden;
 }
 
 .topbar {
@@ -211,6 +218,9 @@ body {
 
 .settings {
   margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .meta {
@@ -223,7 +233,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin: 12px 0;
+  margin: 0;
+}
+
+.field span {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .field input[type="number"],
@@ -254,8 +269,45 @@ input[type="color"] {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 10px 0;
+  margin: 0;
   font-size: 13px;
+  color: var(--muted);
+}
+
+.checkbox input {
+  accent-color: var(--accent);
+}
+
+.settings-group {
+  background: #1c1f27;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.group-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.group-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.group-grid .full {
+  grid-column: 1 / -1;
+}
+
+.settings .helper {
+  margin-top: 6px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -263,6 +315,41 @@ input[type="color"] {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.blur-list {
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+}
+
+.blur-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #1c2027;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.blur-item strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.blur-item button {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 10px;
+}
+
+.blur-empty {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 8px 4px;
 }
 
 button {
@@ -324,30 +411,40 @@ button:disabled {
 .stage {
   display: grid;
   background: transparent;
+  min-height: 0;
 }
 
 .stage-inner {
   display: grid;
-  place-items: center;
-  padding: 24px;
+  justify-items: center;
+  align-content: start;
+  padding: 24px 24px 32px;
+  gap: 12px;
+  height: 100%;
+  overflow: hidden;
 }
 
 .preview-wrap {
   position: relative;
-  width: min(820px, 100%);
-  min-height: 420px;
+  width: min(980px, 100%);
+  height: min(100%, clamp(320px, 62vh, 700px));
   border-radius: 16px;
   border: 1px solid var(--border);
   background: linear-gradient(160deg, #101217, #1a1d24);
   padding: 18px;
   display: grid;
   place-items: center;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .preview-stage {
   position: relative;
-  display: inline-block;
-  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 .preview-placeholder {
@@ -366,9 +463,10 @@ button:disabled {
 .preview-image,
 .preview-video {
   display: block;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   border-radius: 12px;
+  object-fit: contain;
 }
 
 .preview-video.hidden {
@@ -382,9 +480,10 @@ button:disabled {
 }
 
 .helper {
-  margin-top: 14px;
-  font-size: 13px;
+  margin-top: 0;
+  font-size: 12px;
   color: var(--muted);
+  text-align: center;
 }
 
 .inspector {
@@ -392,14 +491,11 @@ button:disabled {
   border-left: 1px solid var(--border);
   padding: 20px;
   overflow-y: auto;
+  height: 100%;
 }
 
-.status-block {
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 12px;
-  background: #1e222a;
-  border: 1px solid var(--border);
+.inspector .panel-section {
+  margin-top: 18px;
 }
 
 .timeline {
@@ -467,7 +563,7 @@ button:disabled {
 @media (max-width: 1100px) {
   .workspace {
     grid-template-columns: 56px 240px 1fr;
-    grid-template-rows: auto 1fr auto auto;
+    grid-template-rows: auto 1fr auto;
   }
 
   .inspector {

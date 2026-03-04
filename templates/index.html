@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Zigma</title>
     <link rel="stylesheet" href="/static/styles.css" />
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.10.1/dist/ffmpeg.min.js"></script>
+    <script src="/static/vendor/ffmpeg/ffmpeg.min.js"></script>
     <script defer src="/static/app.js"></script>
   </head>
   <body>
@@ -22,7 +22,8 @@
           <span class="mode-pill active">Editor</span>
         </div>
         <div class="topbar-actions">
-          <button id="processBtn" class="primary" type="button">Export GIF</button>
+          <button id="processBtn" class="primary" type="button">Process</button>
+          <button id="downloadBtn" class="secondary" type="button" disabled>Download</button>
         </div>
       </header>
 
@@ -69,68 +70,119 @@
           <span>Screen2GIF-style controls</span>
         </div>
         <div class="settings">
-          <label class="field">
-            <span>Target width (px)</span>
-            <input id="targetWidth" type="number" min="1" placeholder="e.g. 480" />
-          </label>
-          <label class="field">
-            <span>Target height (px)</span>
-            <input id="targetHeight" type="number" min="1" placeholder="e.g. 270" />
-          </label>
-          <label class="checkbox">
-            <input id="keepAspect" type="checkbox" checked />
-            <span>Keep aspect ratio if one dimension is blank</span>
-          </label>
-          <label class="field">
-            <span>FPS (frames per second)</span>
-            <input id="fps" type="number" min="1" max="60" step="1" placeholder="e.g. 12" />
-          </label>
-          <label class="checkbox">
-            <input id="resampleFps" type="checkbox" checked />
-            <span>Resample frames to target FPS (smaller file)</span>
-          </label>
-          <label class="field">
-            <span>Trim start (seconds)</span>
-            <input id="trimStart" type="number" min="0" step="0.1" placeholder="e.g. 0.0" />
-          </label>
-          <label class="field">
-            <span>Trim end (seconds)</span>
-            <input id="trimEnd" type="number" min="0" step="0.1" placeholder="e.g. 2.5" />
-          </label>
-          <label class="field">
-            <span>Target size (KB)</span>
-            <input id="targetSize" type="number" min="1" step="10" placeholder="e.g. 800" />
-          </label>
-          <label class="checkbox">
-            <input id="autoReduce" type="checkbox" checked />
-            <span>Auto reduce to target size (may drop frames/scale)</span>
-          </label>
-          <div class="panel-section">
-            <div class="section-title">Annotations</div>
-            <label class="checkbox">
-              <input id="blurEnable" type="checkbox" />
-              <span>Blur selected region</span>
-            </label>
-            <label class="field">
-              <span>Blur strength</span>
-              <div class="range-wrap">
-                <input id="blurRadius" type="range" min="2" max="24" value="10" />
-                <span id="blurValue">10</span>
-              </div>
-            </label>
-            <label class="checkbox">
-              <input id="boxEnable" type="checkbox" />
-              <span>Highlight box</span>
-            </label>
-            <label class="field">
-              <span>Box color</span>
-              <input id="boxColor" type="color" value="#4dd2b7" />
-            </label>
-            <label class="field">
-              <span>Box thickness (px)</span>
-              <input id="boxThickness" type="number" min="1" max="20" value="3" />
-            </label>
-            <button id="clearSelection" type="button" class="secondary">Clear selection</button>
+          <div class="settings-group">
+            <div class="group-title">Size</div>
+            <div class="group-grid">
+              <label class="field">
+                <span>Target width (px)</span>
+                <input id="targetWidth" type="number" min="1" placeholder="e.g. 480" />
+              </label>
+              <label class="field">
+                <span>Target height (px)</span>
+                <input id="targetHeight" type="number" min="1" placeholder="e.g. 270" />
+              </label>
+              <label class="checkbox full">
+                <input id="keepAspect" type="checkbox" checked />
+                <span>Keep aspect ratio if one dimension is blank</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="group-title">Timing</div>
+            <div class="group-grid">
+              <label class="field">
+                <span>FPS (frames per second)</span>
+                <input id="fps" type="number" min="1" max="60" step="1" placeholder="e.g. 12" />
+              </label>
+              <div class="meta">Detected FPS: <span id="sourceFps">—</span></div>
+              <label class="field">
+                <span>Trim start (seconds)</span>
+                <input id="trimStart" type="number" min="0" step="0.1" placeholder="e.g. 0.0" />
+              </label>
+              <label class="field">
+                <span>Trim end (seconds)</span>
+                <input id="trimEnd" type="number" min="0" step="0.1" placeholder="e.g. 2.5" />
+              </label>
+              <label class="checkbox full">
+                <input id="resampleFps" type="checkbox" checked />
+                <span>Resample frames to target FPS (smaller file)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="group-title">Compression</div>
+            <div class="group-grid">
+              <label class="field">
+                <span>Target size (KB)</span>
+                <input id="targetSize" type="number" min="1" step="10" placeholder="e.g. 800" />
+              </label>
+              <label class="checkbox full">
+                <input id="autoReduce" type="checkbox" checked />
+                <span>Auto reduce to target size (may drop frames/scale)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="group-title">Blur Regions</div>
+            <div class="group-grid">
+              <label class="checkbox full">
+                <input id="blurEnable" type="checkbox" />
+                <span>Enable blur regions</span>
+              </label>
+              <label class="field">
+                <span>Blur strength</span>
+                <div class="range-wrap">
+                  <input id="blurRadius" type="range" min="2" max="24" value="10" />
+                  <span id="blurValue">10</span>
+                </div>
+              </label>
+              <label class="field">
+                <span>Blur start (seconds)</span>
+                <input id="blurStart" type="number" min="0" step="0.1" placeholder="e.g. 0.5" />
+              </label>
+              <label class="field">
+                <span>Blur end (seconds)</span>
+                <input id="blurEnd" type="number" min="0" step="0.1" placeholder="e.g. 2.0" />
+              </label>
+              <button id="addBlurRegion" type="button" class="secondary full">Add blur region</button>
+              <div id="blurRegionList" class="blur-list"></div>
+              <button id="clearBlurRegions" type="button" class="secondary full">Clear all blurs</button>
+              <p class="helper">Leave blur start/end blank to blur the entire clip. Add multiple regions for different times.</p>
+              <button id="clearSelection" type="button" class="secondary full">Clear selection</button>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="group-title">Highlight Box</div>
+            <div class="group-grid">
+              <label class="checkbox full">
+                <input id="boxEnable" type="checkbox" />
+                <span>Enable highlight box</span>
+              </label>
+              <label class="field">
+                <span>Box color</span>
+                <input id="boxColor" type="color" value="#4dd2b7" />
+              </label>
+              <label class="field">
+                <span>Box thickness (px)</span>
+                <input id="boxThickness" type="number" min="1" max="20" value="3" />
+              </label>
+              <label class="field">
+                <span>Highlight start (seconds)</span>
+                <input id="boxStart" type="number" min="0" step="0.1" placeholder="e.g. 1.0" />
+              </label>
+              <label class="field">
+                <span>Highlight end (seconds)</span>
+                <input id="boxEnd" type="number" min="0" step="0.1" placeholder="e.g. 3.0" />
+              </label>
+              <button id="addBoxRegion" type="button" class="secondary full">Add highlight region</button>
+              <div id="boxRegionList" class="blur-list"></div>
+              <button id="clearBoxRegions" type="button" class="secondary full">Clear all highlights</button>
+              <p class="helper">Leave highlight start/end blank to show the box for the entire clip. Add multiple highlight regions as needed.</p>
+            </div>
           </div>
           <div class="status-block">
             <p id="status" class="status"></p>
@@ -140,18 +192,6 @@
         </div>
       </aside>
 
-      <div class="timeline">
-        <div class="timeline-header">
-          <span>Timeline</span>
-          <span class="timeline-time">00:00 / 00:00</span>
-        </div>
-        <div class="timeline-track">
-          <div class="track-label">Track 1</div>
-          <div class="timeline-bar">
-            <div class="timeline-progress"></div>
-          </div>
-        </div>
-      </div>
     </div>
   </body>
 </html>
